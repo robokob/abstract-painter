@@ -386,18 +386,6 @@
 <!-- ── Modules (ES6) ─────────────────────────────────────────────────────── -->
 <script type="module" src="app.js"></script>
 
-<!-- ── Panel close buttons wiring (inline, no module needed) ──────────────── -->
-<script>
-  // Wire close buttons for panels before app.js loads
-  document.getElementById('btn-settings-close').addEventListener('click', () => {
-    document.getElementById('settings-panel').classList.remove('open');
-    document.getElementById('settings-panel').setAttribute('aria-hidden', 'true');
-  });
-  document.getElementById('btn-gallery-close').addEventListener('click', () => {
-    document.getElementById('gallery-panel').classList.remove('open');
-    document.getElementById('gallery-panel').setAttribute('aria-hidden', 'true');
-  });
-</script>
 
 </body>
 </html>

@@ -9,7 +9,7 @@
  *  - Use relative URLs (no leading slash) so the scope is correct on sub-path deployments.
  */
 
-const CACHE_NAME = 'abstract-painter-v1';
+const CACHE_NAME = 'abstract-painter-v2';
 
 // Relative URLs — work regardless of deployment path
 const CACHE_ASSETS = [

@@ -251,22 +251,33 @@ class StorageManager {
 
   exportUserShapesJSON() { return JSON.stringify(this._userShapes, null, 2); }
 
-  importUserShapesJSON(json) {
+  importUserShapesJSON(json, name) {
     try {
       const data = JSON.parse(json);
-      const items = Array.isArray(data) ? data : [data];
+      const isShapeObj = (o) => !!o && typeof o === 'object' && typeof o.type === 'string';
+      const isSetObj    = (o) => !!o && typeof o === 'object' && Array.isArray(o.shapes);
+
+      // Normalize input into a list of "set" objects ({ name?, shapes: [...] })
+      let sets;
+      if (Array.isArray(data)) {
+        // Array of shape sets (round-trip export format) vs. a flat array of raw shapes
+        sets = data.every(isSetObj) ? data : [{ name, shapes: data.filter(isShapeObj) }];
+      } else if (isSetObj(data)) {
+        sets = [data];
+      } else if (isShapeObj(data)) {
+        sets = [{ name, shapes: [data] }];
+      } else {
+        sets = [];
+      }
+
       const ids = new Set(this._userShapes.map(s => s.id));
       let added = 0;
-      for (const item of items) {
-        const rawShapes = Array.isArray(item.shapes)
-          ? item.shapes
-          : Array.isArray(item) ? item : null;
-        if (!rawShapes) continue;
-        const valid = rawShapes.filter(s => s && typeof s.type === 'string');
+      for (const item of sets) {
+        const valid = (item.shapes || []).filter(isShapeObj);
         if (valid.length === 0) continue;
         const entry = {
           id:        item.id && !ids.has(item.id) ? item.id : this._uid('ss'),
-          name:      item.name || `Imported Shapes ${this._userShapes.length + 1}`,
+          name:      item.name || name || `Imported Shapes ${this._userShapes.length + 1}`,
           shapes:    valid,
           createdAt: item.createdAt || Date.now()
         };

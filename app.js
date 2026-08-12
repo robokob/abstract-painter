@@ -144,23 +144,44 @@ class AbstractPainterApp {
     ShapeAnimator.assignDrift(shapes);
 
     // Inject user shape sets that are marked active
-    const userShapeSets = this._storage.getUserShapeSets();
-    for (const set of userShapeSets) {
-      if (!set._active) continue;
-      for (const sd of set.shapes) {
-        try {
-          const s = shapeFromJSON({ ...sd });
-          s.animProgress = 0;
-          s.animType = this._params.animType;
-          s.animDelay = Math.random() * 0.4;
-          s.animDuration = 0.6 + Math.random() * 0.6;
-          ShapeAnimator.assignDrift([s]);
-          shapes.push(s);
-        } catch { /* skip invalid shapes */ }
+    try {
+      const userShapeSets = this._storage.getUserShapeSets();
+      if (userShapeSets && Array.isArray(userShapeSets)) {
+        for (const set of userShapeSets) {
+          if (!set || !set._active) continue;
+          if (!set.shapes || !Array.isArray(set.shapes)) continue;
+          
+          for (const sd of set.shapes) {
+            try {
+              if (!sd || typeof sd !== 'object') continue;
+              
+              // Create a clean copy of the shape data without any prototype properties
+              const cleanData = {};
+              for (const key in sd) {
+                if (sd.hasOwnProperty(key) && !key.startsWith('_')) {
+                  cleanData[key] = sd[key];
+                }
+              }
+              const s = shapeFromJSON(cleanData);
+              s.animProgress = 0;
+              s.animType = this._params.animType;
+              s.animDelay = Math.random() * 0.4;
+              s.animDuration = 0.6 + Math.random() * 0.6;
+              ShapeAnimator.assignDrift([s]);
+              shapes.push(s);
+            } catch (e) {
+              // Skip invalid shapes silently
+            }
+          }
+        }
+        // Re-sort by depth after injection only if we added shapes
+        if (shapes.length > 0) {
+          shapes.sort((a, b) => a.depth - b.depth);
+        }
       }
+    } catch (e) {
+      // Continue with regular generation - don't fail the whole painting
     }
-    // Re-sort by depth after injection
-    shapes.sort((a, b) => a.depth - b.depth);
 
     const doSwap = () => {
       this._shapes = shapes;
@@ -278,6 +299,8 @@ class AbstractPainterApp {
 
     this._on('btn-gallery', 'click', () => this._toggleGallery());
     this._on('btn-settings', 'click', () => this._toggleSettings());
+    this._on('btn-gallery-close', 'click', () => this._toggleGallery(false));
+    this._on('btn-settings-close', 'click', () => this._toggleSettings(false));
 
     this._on('btn-dark-mode', 'click', () => {
       this._darkMode = !this._darkMode;
@@ -1418,5 +1441,14 @@ class AbstractPainterApp {
 
 // ─── Bootstrap ───────────────────────────────────────────────────────────────
 
-const app = new AbstractPainterApp();
-app.init();
+// Wait for DOM to be ready before initializing
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    const app = new AbstractPainterApp();
+    app.init();
+  });
+} else {
+  // DOM already loaded
+  const app = new AbstractPainterApp();
+  app.init();
+}
