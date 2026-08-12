@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#1a1a2e">
+  <meta name="description" content="Abstract Painter – a Kandinsky-inspired generative art PWA">
+
+  <!-- Android Chrome PWA -->
+  <meta name="mobile-web-app-capable" content="yes">
+
+  <!-- iOS Safari PWA -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Abstract Painter">
+
+  <!-- iOS touch icons (multiple sizes for all devices) -->
+  <link rel="apple-touch-icon" href="assets/icons/192.png">
+  <link rel="apple-touch-icon" sizes="152x152" href="assets/icons/192.png">
+  <link rel="apple-touch-icon" sizes="167x167" href="assets/icons/192.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/icons/192.png">
+
+  <!-- iOS splash screens (prevents white flash on launch) -->
+  <meta name="apple-touch-fullscreen" content="yes">
+
+  <!-- PWA manifest -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="assets/icons/512.png">
+
+  <title>Abstract Painter</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ── Canvas ──────────────────────────────────────────────────────────────── -->
+<div id="canvas-container" aria-hidden="true">
+  <canvas id="main-canvas" role="img" aria-label="Abstract painting canvas"></canvas>
+</div>
+
+<!-- ── Overlay backdrop ────────────────────────────────────────────────────── -->
+<div id="overlay" aria-hidden="true"></div>
+
+<!-- ── Lock indicator ──────────────────────────────────────────────────────── -->
+<div id="lock-indicator" aria-live="polite">🔒 Composition locked</div>
+
+<!-- ── Toolbar ─────────────────────────────────────────────────────────────── -->
+<nav id="toolbar" role="toolbar" aria-label="Painting controls">
+
+  <!-- Generate (primary action) -->
+  <button id="btn-generate" class="toolbar-btn primary" title="Generate new painting (Space)" aria-label="Generate new painting">
+    <span class="icon" aria-hidden="true">✦</span>
+  </button>
+
+  <div class="toolbar-divider" role="separator"></div>
+
+  <!-- Undo -->
+  <button id="btn-undo" class="toolbar-btn" title="Undo (Ctrl+Z)" aria-label="Undo" disabled>
+    <span class="icon" aria-hidden="true">↩</span>
+  </button>
+
+  <!-- Redo -->
+  <button id="btn-redo" class="toolbar-btn" title="Redo (Ctrl+Y)" aria-label="Redo" disabled>
+    <span class="icon" aria-hidden="true">↪</span>
+  </button>
+
+  <div class="toolbar-divider" role="separator"></div>
+
+  <!-- Save PNG -->
+  <button id="btn-save-png" class="toolbar-btn" title="Save as PNG" aria-label="Save PNG">
+    <span class="icon" aria-hidden="true">⬇</span>
+  </button>
+
+  <!-- Export SVG -->
+  <button id="btn-save-svg" class="toolbar-btn" title="Export as SVG" aria-label="Export SVG">
+    <span class="icon" aria-hidden="true">◻</span>
+  </button>
+
+  <!-- Save to Gallery -->
+  <button id="btn-save-gallery" class="toolbar-btn" title="Save to gallery (Ctrl+S)" aria-label="Save to gallery">
+    <span class="icon" aria-hidden="true">♡</span>
+  </button>
+
+  <div class="toolbar-divider" role="separator"></div>
+
+  <!-- Gallery -->
+  <button id="btn-gallery" class="toolbar-btn" title="Open gallery" aria-label="Gallery" aria-haspopup="dialog" aria-expanded="false">
+    <span class="icon" aria-hidden="true">⊞</span>
+  </button>
+
+  <!-- Settings -->
+  <button id="btn-settings" class="toolbar-btn" title="Settings" aria-label="Settings" aria-haspopup="dialog" aria-expanded="false">
+    <span class="icon" aria-hidden="true">⚙</span>
+  </button>
+
+  <div class="toolbar-divider" role="separator"></div>
+
+  <!-- Lock composition -->
+  <button id="btn-lock" class="toolbar-btn" title="Lock composition" aria-label="Lock composition" aria-pressed="false">
+    <span class="icon" aria-hidden="true">🔓</span>
+  </button>
+
+  <!-- Dark mode -->
+  <button id="btn-dark-mode" class="toolbar-btn" title="Toggle dark mode" aria-label="Toggle dark mode" aria-pressed="true">
+    <span class="icon" aria-hidden="true">☀️</span>
+  </button>
+
+  <!-- Fullscreen -->
+  <button id="btn-fullscreen" class="toolbar-btn" title="Fullscreen (F)" aria-label="Toggle fullscreen">
+    <span class="icon" aria-hidden="true">⛶</span>
+  </button>
+
+  <!-- Install PWA -->
+  <button id="btn-install" class="toolbar-btn" title="Install app" aria-label="Install Abstract Painter">
+    <span class="icon" aria-hidden="true">⊕</span>
+  </button>
+</nav>
+
+<!-- ── Hide UI button ──────────────────────────────────────────────────────── -->
+<button id="btn-hide-ui" title="Toggle toolbar" aria-label="Toggle toolbar visibility">✕</button>
+
+<!-- ── Settings Panel ──────────────────────────────────────────────────────── -->
+<aside id="settings-panel" class="side-panel" role="dialog" aria-label="Settings" aria-hidden="true">
+  <div class="panel-header">
+    <h2>Settings</h2>
+    <button class="panel-close" id="btn-settings-close" aria-label="Close settings">✕</button>
+  </div>
+
+  <div class="panel-body">
+
+    <!-- Palette -->
+    <section class="settings-section" aria-labelledby="section-palette-heading">
+      <h3 id="section-palette-heading">Color Palette</h3>
+      <div id="palette-list" role="radiogroup" aria-label="Select palette"></div>
+    </section>
+
+    <!-- Background -->
+    <section class="settings-section" aria-labelledby="section-bg-heading">
+      <h3 id="section-bg-heading">Background</h3>
+      <div id="bg-colors" role="group" aria-label="Background color presets"></div>
+      <div class="bg-custom-row">
+        <label for="bg-color-picker">Custom:</label>
+        <input type="color" id="bg-color-picker" value="#1a1a2e" aria-label="Custom background color">
+      </div>
+    </section>
+
+    <!-- Composition -->
+    <section class="settings-section" aria-labelledby="section-composition-heading">
+      <h3 id="section-composition-heading">Composition</h3>
+
+      <div class="slider-row">
+        <label class="slider-label" for="slider-count">Shapes</label>
+        <input type="range" id="slider-count" min="10" max="200" step="1" value="60" aria-label="Shape count">
+        <span class="slider-val" id="slider-count-val">60</span>
+      </div>
+
+      <div class="slider-row">
+        <label class="slider-label" for="slider-density">Density</label>
+        <input type="range" id="slider-density" min="0" max="1" step="0.01" value="0.6" aria-label="Density">
+        <span class="slider-val" id="slider-density-val">0.60</span>
+      </div>
+
+      <div class="slider-row">
+        <label class="slider-label" for="slider-complexity">Complexity</label>
+        <input type="range" id="slider-complexity" min="0" max="1" step="0.01" value="0.6" aria-label="Complexity">
+        <span class="slider-val" id="slider-complexity-val">0.60</span>
+      </div>
+
+      <div class="slider-row">
+        <label class="slider-label" for="slider-randomness">Randomness</label>
+        <input type="range" id="slider-randomness" min="0" max="1" step="0.01" value="0.5" aria-label="Randomness">
+        <span class="slider-val" id="slider-randomness-val">0.50</span>
+      </div>
+
+      <div class="slider-row">
+        <label class="slider-label" for="slider-depth">Depth</label>
+        <input type="range" id="slider-depth" min="0" max="1" step="0.01" value="0.7" aria-label="Depth amount">
+        <span class="slider-val" id="slider-depth-val">0.70</span>
+      </div>
+
+      <div class="slider-row">
+        <label class="slider-label" for="slider-noise">Noise</label>
+        <input type="range" id="slider-noise" min="0" max="1" step="0.01" value="0.3" aria-label="Noise amount">
+        <span class="slider-val" id="slider-noise-val">0.30</span>
+      </div>
+    </section>
+
+    <!-- Size -->
+    <section class="settings-section" aria-labelledby="section-size-heading">
+      <h3 id="section-size-heading">Shape Size</h3>
+
+      <div class="slider-row">
+        <label class="slider-label" for="slider-min-size">Min size</label>
+        <input type="range" id="slider-min-size" min="2" max="80" step="1" value="10" aria-label="Minimum size">
+        <span class="slider-val" id="slider-min-size-val">10</span>
+      </div>
+
+      <div class="slider-row">
+        <label class="slider-label" for="slider-max-size">Max size</label>
+        <input type="range" id="slider-max-size" min="20" max="400" step="5" value="120" aria-label="Maximum size">
+        <span class="slider-val" id="slider-max-size-val">120</span>
+      </div>
+
+      <div class="slider-row">
+        <label class="slider-label" for="slider-scale">Scale var.</label>
+        <input type="range" id="slider-scale" min="0" max="1" step="0.01" value="0.5" aria-label="Scale randomness">
+        <span class="slider-val" id="slider-scale-val">0.50</span>
+      </div>
+    </section>
+
+    <!-- Style -->
+    <section class="settings-section" aria-labelledby="section-style-heading">
+      <h3 id="section-style-heading">Style</h3>
+
+      <div class="slider-row">
+        <label class="slider-label" for="slider-opacity">Opacity</label>
+        <input type="range" id="slider-opacity" min="0.1" max="1" step="0.01" value="0.85" aria-label="Opacity">
+        <span class="slider-val" id="slider-opacity-val">0.85</span>
+      </div>
+
+      <div class="slider-row">
+        <label class="slider-label" for="slider-stroke">Stroke</label>
+        <input type="range" id="slider-stroke" min="0" max="10" step="0.5" value="2" aria-label="Stroke width">
+        <span class="slider-val" id="slider-stroke-val">2</span>
+      </div>
+
+      <div class="slider-row">
+        <label class="slider-label" for="slider-rotation">Rotation</label>
+        <input type="range" id="slider-rotation" min="0" max="1" step="0.01" value="0.7" aria-label="Rotation randomness">
+        <span class="slider-val" id="slider-rotation-val">0.70</span>
+      </div>
+    </section>
+
+    <!-- Animation -->
+    <section class="settings-section" aria-labelledby="section-anim-heading">
+      <h3 id="section-anim-heading">Animation</h3>
+
+      <div class="slider-row">
+        <label class="slider-label" for="slider-anim-speed">Speed</label>
+        <input type="range" id="slider-anim-speed" min="0" max="2" step="0.1" value="1" aria-label="Animation speed">
+        <span class="slider-val" id="slider-anim-speed-val">1.0</span>
+      </div>
+
+      <div class="toggle-row">
+        <span class="toggle-label">Continuous motion</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="toggle-motion" aria-label="Enable continuous motion">
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+
+      <div style="margin-bottom: 8px;">
+        <p style="font-size: 12px; color: var(--ui-text-muted); margin-bottom: 8px;">Intro animation type</p>
+        <div class="radio-group" role="radiogroup" aria-label="Animation type">
+          <label class="radio-btn">
+            <input type="radio" name="anim-type" value="fadeIn" checked>
+            Fade In
+          </label>
+          <label class="radio-btn">
+            <input type="radio" name="anim-type" value="scaleIn">
+            Scale In
+          </label>
+          <label class="radio-btn">
+            <input type="radio" name="anim-type" value="none">
+            Instant
+          </label>
+        </div>
+      </div>
+    </section>
+
+  </div>
+  <!-- End panel body -->
+</aside>
+
+<!-- ── Gallery Panel ──────────────────────────────────────────────────────── -->
+<aside id="gallery-panel" class="side-panel" role="dialog" aria-label="Gallery" aria-hidden="true">
+  <div class="panel-header">
+    <h2>Gallery <span id="gallery-count" style="font-weight:400; color: var(--ui-text-muted); font-size:13px;"></span></h2>
+    <button class="panel-close" id="btn-gallery-close" aria-label="Close gallery">✕</button>
+  </div>
+
+  <div class="panel-body">
+    <div id="gallery-grid" role="list" aria-label="Saved paintings"></div>
+  </div>
+
+  <div class="panel-footer">
+    <button id="btn-import" class="action-btn" aria-label="Import gallery from JSON">
+      <span aria-hidden="true">⬆</span> Import
+    </button>
+    <button id="btn-export-gallery" class="action-btn" aria-label="Export gallery as JSON">
+      <span aria-hidden="true">⬇</span> Export
+    </button>
+  </div>
+</aside>
+
+<!-- ── iOS "Add to Home Screen" banner ────────────────────────────────────── -->
+<!-- Shown only on iOS Safari when not already installed; hidden by default    -->
+<div id="ios-install-banner" role="dialog" aria-label="Install Abstract Painter" aria-modal="false">
+  <button id="btn-ios-banner-close" aria-label="Dismiss install banner">✕</button>
+  <div class="ios-banner-row">
+    <div class="ios-banner-icon">
+      <img src="assets/icons/192.png" alt="Abstract Painter icon">
+    </div>
+    <div class="ios-banner-text">
+      <div class="ios-banner-title">Install Abstract Painter</div>
+      <div class="ios-banner-subtitle">Add to your Home Screen for fullscreen offline use</div>
+    </div>
+  </div>
+  <div class="ios-banner-steps">
+    <span class="share-icon" aria-hidden="true">⎋</span>
+    <span>Tap <strong>Share</strong> then <strong>"Add to Home Screen"</strong></span>
+  </div>
+</div>
+
+<!-- ── Modules (ES6) ─────────────────────────────────────────────────────── -->
+<script type="module" src="app.js"></script>
+
+<!-- ── Panel close buttons wiring (inline, no module needed) ──────────────── -->
+<script>
+  // Wire close buttons for panels before app.js loads
+  document.getElementById('btn-settings-close').addEventListener('click', () => {
+    document.getElementById('settings-panel').classList.remove('open');
+    document.getElementById('settings-panel').setAttribute('aria-hidden', 'true');
+  });
+  document.getElementById('btn-gallery-close').addEventListener('click', () => {
+    document.getElementById('gallery-panel').classList.remove('open');
+    document.getElementById('gallery-panel').setAttribute('aria-hidden', 'true');
+  });
+</script>
+
+</body>
+</html>

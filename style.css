@@ -1,0 +1,822 @@
+/* ─── Reset & Base ─────────────────────────────────────────────────────────── */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --ui-bg: rgba(18, 18, 30, 0.88);
+  --ui-bg-solid: #12121e;
+  --ui-border: rgba(255, 255, 255, 0.1);
+  --ui-text: #e0e0f0;
+  --ui-text-muted: #8888aa;
+  --ui-accent: #6c63ff;
+  --ui-accent-hover: #8a84ff;
+  --ui-danger: #e63946;
+  --ui-success: #06ffa5;
+  --btn-radius: 10px;
+  --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+  --transition: 0.2s ease;
+
+  /* iOS safe areas — zero on non-notch devices */
+  --safe-top:    env(safe-area-inset-top,    0px);
+  --safe-right:  env(safe-area-inset-right,  0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left:   env(safe-area-inset-left,   0px);
+}
+
+:root.light {
+  --ui-bg: rgba(248, 248, 255, 0.92);
+  --ui-bg-solid: #f0f0f8;
+  --ui-border: rgba(0, 0, 0, 0.1);
+  --ui-text: #1a1a2e;
+  --ui-text-muted: #555577;
+  --ui-accent: #6c63ff;
+  --ui-accent-hover: #4f46e5;
+  --shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+}
+
+html {
+  /* dvh = dynamic viewport height: shrinks when iOS browser chrome is visible */
+  height: 100dvh;
+  height: -webkit-fill-available; /* iOS Safari 12 fallback */
+  height: 100vh;                  /* final non-dvh fallback */
+}
+
+body {
+  width: 100%;
+  height: 100dvh;
+  height: -webkit-fill-available;
+  height: 100vh;
+  overflow: hidden;
+  font-family: var(--font);
+  background: #1a1a2e;
+  color: var(--ui-text);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ─── Canvas ───────────────────────────────────────────────────────────────── */
+
+#canvas-container {
+  position: fixed;
+  inset: 0;
+  /* Stretch behind notch and home bar for full-bleed art */
+  width: 100vw;
+  height: 100dvh;
+  height: -webkit-fill-available;
+  height: 100vh;
+}
+
+#main-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+  touch-action: none;
+  /* Prevent long-press magnifier on iOS */
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* ─── Toolbar ──────────────────────────────────────────────────────────────── */
+
+#toolbar {
+  position: fixed;
+  bottom: calc(20px + var(--safe-bottom));   /* clear home indicator */
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--ui-bg);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid var(--ui-border);
+  border-radius: 20px;
+  padding: 8px 12px;
+  /* Extra horizontal padding for iPhone notch landscape */
+  padding-left:  calc(12px + var(--safe-left));
+  padding-right: calc(12px + var(--safe-right));
+  box-shadow: var(--shadow);
+  transition: opacity var(--transition), transform var(--transition);
+  max-width: calc(100vw - 24px - var(--safe-left) - var(--safe-right));
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+#toolbar.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) translateY(20px);
+}
+
+/* ─── Toolbar Buttons ──────────────────────────────────────────────────────── */
+
+.toolbar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 44px minimum touch target (Apple HIG) */
+  min-width: 44px;
+  min-height: 44px;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: var(--btn-radius);
+  background: transparent;
+  color: var(--ui-text);
+  cursor: pointer;
+  font-size: 18px;
+  transition: background var(--transition), transform var(--transition), color var(--transition);
+  flex-shrink: 0;
+  position: relative;
+  -webkit-tap-highlight-color: transparent;
+  /* Prevent iOS callout on long-press */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+}
+
+.toolbar-btn:hover,
+.toolbar-btn:focus-visible {
+  background: rgba(108, 99, 255, 0.2);
+  outline: 2px solid var(--ui-accent);
+  outline-offset: 2px;
+}
+
+.toolbar-btn:active {
+  transform: scale(0.92);
+  background: rgba(108, 99, 255, 0.25);
+}
+
+.toolbar-btn.active {
+  background: rgba(108, 99, 255, 0.3);
+  color: var(--ui-accent);
+}
+
+.toolbar-btn.primary {
+  background: var(--ui-accent);
+  color: white;
+  width: 52px;
+  height: 52px;
+  min-width: 52px;
+  min-height: 52px;
+  font-size: 22px;
+  border-radius: 14px;
+}
+
+.toolbar-btn.primary:hover,
+.toolbar-btn.primary:focus-visible {
+  background: var(--ui-accent-hover);
+}
+
+.toolbar-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+#btn-install {
+  display: none;
+  background: var(--ui-success);
+  color: #000;
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 28px;
+  background: var(--ui-border);
+  flex-shrink: 0;
+}
+
+/* ─── Hide-UI floating button ──────────────────────────────────────────────── */
+
+#btn-hide-ui {
+  position: fixed;
+  bottom: calc(20px + var(--safe-bottom));
+  right: calc(16px + var(--safe-right));
+  z-index: 101;
+  width: 36px;
+  height: 36px;
+  font-size: 14px;
+  background: var(--ui-bg);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--ui-border);
+  border-radius: 50%;
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition);
+  box-shadow: var(--shadow);
+  -webkit-tap-highlight-color: transparent;
+}
+
+#btn-hide-ui:hover,
+#btn-hide-ui:active {
+  color: var(--ui-text);
+  background: rgba(108, 99, 255, 0.3);
+}
+
+/* ─── Side Panels ──────────────────────────────────────────────────────────── */
+
+.side-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(380px, 100vw);
+  z-index: 200;
+  background: var(--ui-bg-solid);
+  border-left: 1px solid var(--ui-border);
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: -8px 0 40px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+  /* Respect safe areas on panel edges */
+  padding-right:  var(--safe-right);
+  padding-bottom: var(--safe-bottom);
+}
+
+.side-panel.open {
+  transform: translateX(0);
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  padding-top: calc(16px + var(--safe-top)); /* notch */
+  border-bottom: 1px solid var(--ui-border);
+  flex-shrink: 0;
+}
+
+.panel-header h2 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ui-text);
+}
+
+.panel-close {
+  min-width: 44px;
+  min-height: 44px;
+  width: 44px;
+  height: 44px;
+  border: none;
+  background: transparent;
+  color: var(--ui-text-muted);
+  font-size: 18px;
+  cursor: pointer;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.panel-close:hover,
+.panel-close:active {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--ui-text);
+}
+
+.panel-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch; /* iOS momentum scrolling */
+  overscroll-behavior: contain;
+  padding: 16px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ui-accent) transparent;
+}
+
+.panel-body::-webkit-scrollbar { width: 4px; }
+.panel-body::-webkit-scrollbar-thumb { background: var(--ui-accent); border-radius: 2px; }
+
+.panel-footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--ui-border);
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ─── Settings Sections ────────────────────────────────────────────────────── */
+
+.settings-section { margin-bottom: 24px; }
+
+.settings-section h3 {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ui-text-muted);
+  margin-bottom: 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+/* ─── Sliders ──────────────────────────────────────────────────────────────── */
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  /* Ensure touch targets are tall enough */
+  min-height: 36px;
+}
+
+.slider-label {
+  font-size: 12px;
+  color: var(--ui-text-muted);
+  min-width: 90px;
+  flex-shrink: 0;
+}
+
+.slider-row input[type="range"] {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--ui-border);
+  outline: none;
+  cursor: pointer;
+  /* iOS needs explicit height for the track */
+  touch-action: pan-x;
+}
+
+.slider-row input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 22px;   /* larger for touch */
+  height: 22px;
+  border-radius: 50%;
+  background: var(--ui-accent);
+  cursor: pointer;
+  transition: transform var(--transition);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
+
+.slider-row input[type="range"]::-webkit-slider-thumb:hover,
+.slider-row input[type="range"]:active::-webkit-slider-thumb {
+  transform: scale(1.2);
+}
+
+.slider-row input[type="range"]::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 50%;
+  background: var(--ui-accent);
+  cursor: pointer;
+}
+
+.slider-val {
+  font-size: 11px;
+  color: var(--ui-text-muted);
+  min-width: 32px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Palette Selector ─────────────────────────────────────────────────────── */
+
+#palette-list { display: flex; flex-direction: column; gap: 6px; }
+
+.palette-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;  /* taller for touch */
+  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  background: transparent;
+  cursor: pointer;
+  color: var(--ui-text);
+  transition: all var(--transition);
+  text-align: left;
+  min-height: 44px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.palette-btn:hover,
+.palette-btn:active { background: rgba(108, 99, 255, 0.1); border-color: var(--ui-accent); }
+.palette-btn.active { background: rgba(108, 99, 255, 0.2); border-color: var(--ui-accent); }
+.palette-btn:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
+
+.palette-swatches { display: flex; gap: 3px; flex-shrink: 0; }
+
+.swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.palette-label { font-size: 13px; font-weight: 500; }
+
+/* ─── Background Selector ──────────────────────────────────────────────────── */
+
+#bg-colors { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+
+.bg-swatch {
+  width: 32px;   /* larger tap target */
+  height: 32px;
+  border-radius: 6px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all var(--transition);
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.bg-swatch:hover,
+.bg-swatch:active { transform: scale(1.15); border-color: var(--ui-text); }
+.bg-swatch.active { border-color: var(--ui-accent); box-shadow: 0 0 0 2px var(--ui-accent); }
+
+.bg-custom-row { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+.bg-custom-row label { font-size: 12px; color: var(--ui-text-muted); }
+
+#bg-color-picker {
+  width: 44px;
+  height: 32px;
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+/* ─── Toggle Switch ────────────────────────────────────────────────────────── */
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  min-height: 44px;
+}
+
+.toggle-label { font-size: 13px; color: var(--ui-text); }
+
+.toggle-switch { position: relative; width: 44px; height: 26px; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+
+.toggle-track {
+  position: absolute;
+  inset: 0;
+  background: var(--ui-border);
+  border-radius: 13px;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.toggle-track::after {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: white;
+  top: 3px;
+  left: 3px;
+  transition: transform var(--transition);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+.toggle-switch input:checked + .toggle-track { background: var(--ui-accent); }
+.toggle-switch input:checked + .toggle-track::after { transform: translateX(18px); }
+.toggle-switch input:focus-visible + .toggle-track { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
+
+/* ─── Radio buttons (animation type) ──────────────────────────────────────── */
+
+.radio-group { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.radio-btn {
+  padding: 7px 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: 20px;
+  font-size: 12px;
+  cursor: pointer;
+  background: transparent;
+  color: var(--ui-text-muted);
+  transition: all var(--transition);
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.radio-btn:hover,
+.radio-btn:active { border-color: var(--ui-accent); color: var(--ui-text); }
+.radio-btn input { position: absolute; opacity: 0; width: 0; height: 0; }
+.radio-btn:has(input:checked) { background: var(--ui-accent); border-color: var(--ui-accent); color: white; }
+
+/* ─── Gallery ──────────────────────────────────────────────────────────────── */
+
+#gallery-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+.gallery-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all var(--transition);
+  display: flex;
+  flex-direction: column;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.gallery-card:hover,
+.gallery-card:active { border-color: var(--ui-accent); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+.gallery-card:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
+
+.gallery-thumb { width: 100%; aspect-ratio: 4/3; background: #0d0d1a; overflow: hidden; flex-shrink: 0; }
+.gallery-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.gallery-info { padding: 8px; flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.gallery-name { font-size: 11px; font-weight: 600; color: var(--ui-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gallery-date { font-size: 10px; color: var(--ui-text-muted); }
+
+.gallery-actions { display: flex; gap: 4px; margin-top: 4px; }
+
+.gallery-actions button {
+  flex: 1;
+  padding: 6px 4px;
+  font-size: 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  transition: all var(--transition);
+  min-height: 32px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.gallery-actions button:hover,
+.gallery-actions button:active { background: rgba(108,99,255,0.2); color: var(--ui-text); border-color: var(--ui-accent); }
+.gallery-actions button.btn-danger:hover,
+.gallery-actions button.btn-danger:active { background: rgba(230,57,70,0.2); border-color: var(--ui-danger); color: var(--ui-danger); }
+
+.gallery-empty { grid-column: 1 / -1; text-align: center; color: var(--ui-text-muted); font-size: 14px; padding: 40px 20px; line-height: 1.6; }
+
+/* ─── Action buttons ───────────────────────────────────────────────────────── */
+
+.action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ui-text);
+  cursor: pointer;
+  font-size: 13px;
+  transition: all var(--transition);
+  flex: 1;
+  min-height: 44px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.action-btn:hover,
+.action-btn:active { background: rgba(108,99,255,0.15); border-color: var(--ui-accent); }
+
+/* ─── Toast ────────────────────────────────────────────────────────────────── */
+
+#toast {
+  position: fixed;
+  bottom: calc(90px + var(--safe-bottom));
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: rgba(20, 20, 36, 0.95);
+  color: var(--ui-text);
+  border: 1px solid var(--ui-border);
+  border-radius: 20px;
+  padding: 10px 22px;
+  font-size: 13px;
+  z-index: 500;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s, transform 0.25s;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  white-space: nowrap;
+  max-width: calc(100vw - 40px);
+}
+
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ─── Overlay ──────────────────────────────────────────────────────────────── */
+
+#overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+
+#overlay.active { opacity: 1; pointer-events: all; }
+
+/* ─── Lock indicator ───────────────────────────────────────────────────────── */
+
+#lock-indicator {
+  position: fixed;
+  top: calc(16px + var(--safe-top));
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(108, 99, 255, 0.9);
+  color: white;
+  padding: 8px 18px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  z-index: 90;
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+
+#lock-indicator.visible { opacity: 1; }
+
+/* ─── iOS Install Banner ───────────────────────────────────────────────────── */
+
+#ios-install-banner {
+  display: none;             /* shown by JS on iOS Safari only */
+  position: fixed;
+  bottom: calc(var(--safe-bottom) + 80px);  /* sit above toolbar */
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 300;
+  width: calc(min(360px, 100vw) - 32px);
+  background: var(--ui-bg-solid);
+  border: 1px solid var(--ui-border);
+  border-radius: 16px;
+  padding: 14px 16px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  flex-direction: column;
+  gap: 10px;
+  animation: slideUp 0.4s ease;
+}
+
+.ios-banner-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ios-banner-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.ios-banner-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ios-banner-text {
+  flex: 1;
+}
+
+.ios-banner-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ui-text);
+  margin-bottom: 2px;
+}
+
+.ios-banner-subtitle {
+  font-size: 12px;
+  color: var(--ui-text-muted);
+  line-height: 1.4;
+}
+
+.ios-banner-steps {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(108,99,255,0.1);
+  border: 1px solid rgba(108,99,255,0.3);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--ui-text);
+}
+
+.ios-banner-steps .share-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+#btn-ios-banner-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  background: transparent;
+  border: none;
+  color: var(--ui-text-muted);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ─── Focus ring ───────────────────────────────────────────────────────────── */
+
+:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
+:focus:not(:focus-visible) { outline: none; }
+
+/* ─── Scrollbar ────────────────────────────────────────────────────────────── */
+
+* { scrollbar-width: thin; scrollbar-color: var(--ui-accent) transparent; }
+
+/* ─── Responsive: small phones ─────────────────────────────────────────────── */
+
+@media (max-width: 390px) {
+  #toolbar {
+    bottom: calc(10px + var(--safe-bottom));
+    padding: 6px 8px;
+    padding-left:  calc(8px + var(--safe-left));
+    padding-right: calc(8px + var(--safe-right));
+    gap: 3px;
+    border-radius: 16px;
+  }
+
+  .toolbar-btn { width: 38px; height: 38px; min-width: 38px; min-height: 38px; font-size: 15px; }
+  .toolbar-btn.primary { width: 44px; height: 44px; min-width: 44px; min-height: 44px; font-size: 19px; }
+
+  .side-panel { width: 100vw; }
+  #gallery-grid { grid-template-columns: 1fr; }
+
+  #btn-hide-ui {
+    bottom: calc(10px + var(--safe-bottom));
+    right: calc(10px + var(--safe-right));
+  }
+}
+
+/* Landscape phones: push toolbar left to avoid notch */
+@media (max-height: 500px) and (orientation: landscape) {
+  #toolbar {
+    bottom: calc(8px + var(--safe-bottom));
+    left: calc(50% + var(--safe-left) / 2);
+  }
+}
+
+@media (min-width: 768px) {
+  #toolbar { bottom: calc(24px + var(--safe-bottom)); }
+}
+
+/* ─── Print ────────────────────────────────────────────────────────────────── */
+
+@media print {
+  #toolbar, .side-panel, #toast, #btn-hide-ui, #ios-install-banner { display: none !important; }
+}
+
+/* ─── Keyframes ────────────────────────────────────────────────────────────── */
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── High contrast ────────────────────────────────────────────────────────── */
+
+@media (forced-colors: active) {
+  .toolbar-btn, .palette-btn, .gallery-card { forced-color-adjust: none; }
+}
