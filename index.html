@@ -268,6 +268,77 @@
       </div>
     </section>
 
+    <!-- ── Custom Palettes ──────────────────────────────────────────────── -->
+    <section class="settings-section" aria-labelledby="section-user-palettes-heading">
+      <h3 id="section-user-palettes-heading">Custom Palettes</h3>
+
+      <!-- Builder -->
+      <div class="import-builder" id="palette-builder">
+        <div class="import-builder-row">
+          <input type="text" id="new-palette-name" placeholder="Palette name…"
+                 aria-label="New palette name" maxlength="40" class="import-text-input">
+        </div>
+
+        <!-- Color swatches row -->
+        <div class="color-chips-row" id="new-palette-chips" aria-label="Palette colors" role="list"></div>
+
+        <!-- Add color row -->
+        <div class="import-builder-row">
+          <input type="color" id="new-palette-color" value="#e63946" aria-label="Pick a color">
+          <button class="import-icon-btn" id="btn-add-palette-color" aria-label="Add color">+ Color</button>
+          <input type="color" id="new-palette-bg" value="#1a1a2e" aria-label="Pick a background color">
+          <button class="import-icon-btn" id="btn-add-palette-bg" aria-label="Add background">+ BG</button>
+        </div>
+
+        <!-- Background chips -->
+        <div class="color-chips-row" id="new-palette-bg-chips" aria-label="Background colors" role="list"></div>
+
+        <div class="import-builder-row">
+          <button class="import-action-btn" id="btn-save-user-palette" aria-label="Save custom palette">
+            Save Palette
+          </button>
+          <button class="import-action-btn secondary" id="btn-import-palette-json" aria-label="Import palette from JSON">
+            Import JSON
+          </button>
+          <button class="import-action-btn secondary" id="btn-export-palettes-json" aria-label="Export palettes as JSON">
+            Export
+          </button>
+        </div>
+      </div>
+
+      <!-- Saved list -->
+      <div id="user-palette-list" class="user-item-list" aria-label="Saved custom palettes" role="list"></div>
+    </section>
+
+    <!-- ── Custom Shape Sets ─────────────────────────────────────────────── -->
+    <section class="settings-section" aria-labelledby="section-user-shapes-heading">
+      <h3 id="section-user-shapes-heading">Custom Shape Sets</h3>
+
+      <p class="import-hint">
+        Import shapes from a JSON file — either a single shape object or an array.
+        Shapes are added to new compositions alongside generated ones.
+        <a href="#" id="btn-shapes-template" class="import-link">Download template</a>
+      </p>
+
+      <div class="import-builder">
+        <div class="import-builder-row">
+          <input type="text" id="new-shapes-name" placeholder="Shape set name…"
+                 aria-label="New shape set name" maxlength="40" class="import-text-input">
+        </div>
+        <div class="import-builder-row">
+          <button class="import-action-btn" id="btn-import-shapes-json" aria-label="Import shapes from JSON">
+            Import JSON
+          </button>
+          <button class="import-action-btn secondary" id="btn-export-shapes-json" aria-label="Export shape sets as JSON">
+            Export
+          </button>
+        </div>
+      </div>
+
+      <!-- Saved list -->
+      <div id="user-shape-list" class="user-item-list" aria-label="Saved shape sets" role="list"></div>
+    </section>
+
   </div>
   <!-- End panel body -->
 </aside>

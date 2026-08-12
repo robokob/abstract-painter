@@ -93,6 +93,8 @@ class AbstractPainterApp {
 
     this._applyDarkMode(this._darkMode);
     this._setupAnimTypeSelector();
+    this._setupUserPalettes();
+    this._setupUserShapes();
 
     // Hide fullscreen button on iOS (API not supported)
     if (!SUPPORTS_FULLSCREEN) {
@@ -140,6 +142,25 @@ class AbstractPainterApp {
     );
 
     ShapeAnimator.assignDrift(shapes);
+
+    // Inject user shape sets that are marked active
+    const userShapeSets = this._storage.getUserShapeSets();
+    for (const set of userShapeSets) {
+      if (!set._active) continue;
+      for (const sd of set.shapes) {
+        try {
+          const s = shapeFromJSON({ ...sd });
+          s.animProgress = 0;
+          s.animType = this._params.animType;
+          s.animDelay = Math.random() * 0.4;
+          s.animDuration = 0.6 + Math.random() * 0.6;
+          ShapeAnimator.assignDrift([s]);
+          shapes.push(s);
+        } catch { /* skip invalid shapes */ }
+      }
+    }
+    // Re-sort by depth after injection
+    shapes.sort((a, b) => a.depth - b.depth);
 
     const doSwap = () => {
       this._shapes = shapes;
@@ -321,7 +342,7 @@ class AbstractPainterApp {
         if (!file) return;
         const reader = new FileReader();
         reader.onload = (ev) => {
-          if (this._storage.importJSON(ev.target.result)) {
+          if (this._storage.importGalleryJSON(ev.target.result)) {
             this._showToast('Gallery imported');
             if (this._galleryOpen) this._renderGallery();
           } else {
@@ -334,7 +355,7 @@ class AbstractPainterApp {
     });
 
     this._on('btn-export-gallery', 'click', () => {
-      const json = this._storage.exportJSON();
+      const json = this._storage.exportGalleryJSON();
       const blob = new Blob([json], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       if (IS_IOS) {
@@ -437,29 +458,7 @@ class AbstractPainterApp {
   }
 
   // ─── Palette UI ────────────────────────────────────────────────────────────
-
-  _buildPaletteSelector() {
-    const container = document.getElementById('palette-list');
-    if (!container) return;
-    container.innerHTML = '';
-
-    const randBtn = this._makePaletteBtn('random', 'Random', ['#FF006E', '#FFBE0B', '#3A86FF', '#06FFB4', '#8338EC']);
-    randBtn.addEventListener('click', () => {
-      this._palette.randomize();
-      this._updatePaletteUI();
-    });
-    container.appendChild(randBtn);
-
-    for (const [key, def] of Object.entries(PALETTES)) {
-      const btn = this._makePaletteBtn(key, def.name, def.colors.slice(0, 5));
-      btn.addEventListener('click', () => {
-        this._palette.setPalette(key);
-        this._updatePaletteUI();
-      });
-      container.appendChild(btn);
-    }
-    this._updatePaletteUI();
-  }
+  // Full implementation is in _setupUserPalettes / User Palettes section below.
 
   _makePaletteBtn(key, name, swatches) {
     const btn = document.createElement('button');
@@ -489,7 +488,8 @@ class AbstractPainterApp {
   _updatePaletteUI() {
     const currentKey = this._palette.getCurrentKey();
     document.querySelectorAll('.palette-btn').forEach(btn => {
-      const active = btn.dataset.key === currentKey;
+      const active = btn.dataset.key === currentKey ||
+        (currentKey === 'custom' && btn.dataset.key?.startsWith('custom_'));
       btn.classList.toggle('active', active);
       btn.setAttribute('aria-checked', active.toString());
     });
@@ -1033,6 +1033,356 @@ class AbstractPainterApp {
         }, 2500);
       }
     }
+  }
+
+  // ─── User Palettes ────────────────────────────────────────────────────────
+
+  _setupUserPalettes() {
+    // State for the builder
+    this._newPaletteColors = [];
+    this._newPaletteBgs    = ['#1a1a2e'];
+
+    // Add color chip
+    this._on('btn-add-palette-color', 'click', () => {
+      const hex = document.getElementById('new-palette-color')?.value;
+      if (!hex || this._newPaletteColors.includes(hex)) return;
+      this._newPaletteColors.push(hex);
+      this._renderPaletteChips('new-palette-chips', this._newPaletteColors);
+    });
+
+    // Add background chip
+    this._on('btn-add-palette-bg', 'click', () => {
+      const hex = document.getElementById('new-palette-bg')?.value;
+      if (!hex || this._newPaletteBgs.includes(hex)) return;
+      this._newPaletteBgs.push(hex);
+      this._renderPaletteChips('new-palette-bg-chips', this._newPaletteBgs);
+    });
+
+    // Save palette
+    this._on('btn-save-user-palette', 'click', () => {
+      const name = document.getElementById('new-palette-name')?.value.trim() || '';
+      if (this._newPaletteColors.length === 0) {
+        this._showToast('Add at least one color first');
+        return;
+      }
+      try {
+        this._storage.saveUserPalette(name, this._newPaletteColors, this._newPaletteBgs);
+        this._newPaletteColors = [];
+        this._newPaletteBgs    = ['#1a1a2e'];
+        this._renderPaletteChips('new-palette-chips',    this._newPaletteColors);
+        this._renderPaletteChips('new-palette-bg-chips', this._newPaletteBgs);
+        const nameEl = document.getElementById('new-palette-name');
+        if (nameEl) nameEl.value = '';
+        this._renderUserPaletteList();
+        this._buildPaletteSelector();
+        this._showToast('Palette saved');
+      } catch (e) {
+        this._showToast(e.message);
+      }
+    });
+
+    // Import JSON
+    this._on('btn-import-palette-json', 'click', () => {
+      this._pickFile('.json,text/plain', (text) => {
+        const n = this._storage.importUserPalettesJSON(text);
+        if (n > 0) {
+          this._renderUserPaletteList();
+          this._buildPaletteSelector();
+          this._showToast(`Imported ${n} palette${n > 1 ? 's' : ''}`);
+        } else {
+          this._showToast('No valid palettes found in file');
+        }
+      });
+    });
+
+    // Export JSON
+    this._on('btn-export-palettes-json', 'click', () => {
+      const json = this._storage.exportUserPalettesJSON();
+      this._downloadText(json, 'custom-palettes.json', 'application/json');
+      this._showToast('Palettes exported');
+    });
+
+    this._renderUserPaletteList();
+  }
+
+  _renderPaletteChips(containerId, colors) {
+    const row = document.getElementById(containerId);
+    if (!row) return;
+    row.innerHTML = '';
+    colors.forEach((hex, i) => {
+      const chip = document.createElement('div');
+      chip.className = 'color-chip';
+      chip.style.background = hex;
+      chip.title = hex;
+
+      const rm = document.createElement('button');
+      rm.className = 'color-chip-remove';
+      rm.textContent = '✕';
+      rm.setAttribute('aria-label', `Remove ${hex}`);
+      rm.addEventListener('click', (e) => {
+        e.stopPropagation();
+        colors.splice(i, 1);
+        this._renderPaletteChips(containerId, colors);
+      });
+
+      chip.appendChild(rm);
+      row.appendChild(chip);
+    });
+    if (colors.length === 0) {
+      const hint = document.createElement('span');
+      hint.className = 'color-chip-label';
+      hint.textContent = 'None';
+      row.appendChild(hint);
+    }
+  }
+
+  _renderUserPaletteList() {
+    const list = document.getElementById('user-palette-list');
+    if (!list) return;
+    list.innerHTML = '';
+
+    const palettes = this._storage.getUserPalettes();
+    for (const pal of palettes) {
+      const row = document.createElement('div');
+      row.className = 'user-item-row';
+      row.dataset.id = pal.id;
+
+      // Swatches preview
+      const swatches = document.createElement('div');
+      swatches.className = 'user-item-swatches';
+      pal.colors.slice(0, 8).forEach(c => {
+        const s = document.createElement('span');
+        s.className = 'user-item-swatch';
+        s.style.background = c;
+        swatches.appendChild(s);
+      });
+
+      const name = document.createElement('span');
+      name.className = 'user-item-name';
+      name.textContent = pal.name;
+
+      const meta = document.createElement('span');
+      meta.className = 'user-item-meta';
+      meta.textContent = `${pal.colors.length} colors`;
+
+      const actions = document.createElement('div');
+      actions.className = 'user-item-actions';
+
+      const useBtn = document.createElement('button');
+      useBtn.className = 'user-item-btn';
+      useBtn.textContent = 'Use';
+      useBtn.setAttribute('aria-label', `Use palette ${pal.name}`);
+      useBtn.addEventListener('click', () => {
+        this._palette.setCustomPalette(pal.colors, pal.backgrounds.length ? pal.backgrounds : ['#1a1a2e']);
+        this._updatePaletteUI();
+        this._showToast(`Palette "${pal.name}" active`);
+      });
+
+      const renameBtn = document.createElement('button');
+      renameBtn.className = 'user-item-btn';
+      renameBtn.textContent = 'Rename';
+      renameBtn.addEventListener('click', () => {
+        const n = prompt('Rename palette:', pal.name);
+        if (n?.trim()) {
+          this._storage.renameUserPalette(pal.id, n.trim());
+          this._renderUserPaletteList();
+          this._buildPaletteSelector();
+        }
+      });
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'user-item-btn danger';
+      delBtn.textContent = '✕';
+      delBtn.setAttribute('aria-label', `Delete palette ${pal.name}`);
+      delBtn.addEventListener('click', () => {
+        if (confirm(`Delete palette "${pal.name}"?`)) {
+          this._storage.deleteUserPalette(pal.id);
+          this._renderUserPaletteList();
+          this._buildPaletteSelector();
+        }
+      });
+
+      actions.append(useBtn, renameBtn, delBtn);
+      row.append(swatches, name, meta, actions);
+      list.appendChild(row);
+    }
+  }
+
+  // ─── User Shape Sets ──────────────────────────────────────────────────────
+
+  _setupUserShapes() {
+    // Template download
+    this._on('btn-shapes-template', 'click', (e) => {
+      e.preventDefault();
+      const template = JSON.stringify([
+        { type: 'circle',   x: 200, y: 200, radius: 60,  color: '#e63946', opacity: 0.9,  rotation: 0,    depth: 0.5, blendMode: 'source-over', strokeColor: null, strokeWidth: 0, animType: 'fadeIn' },
+        { type: 'triangle', x: 400, y: 300, size:   100, color: '#457b9d', opacity: 0.85, rotation: 0.5,  depth: 0.7, blendMode: 'source-over', strokeColor: null, strokeWidth: 0, animType: 'fadeIn', fill: true },
+        { type: 'rect',     x: 600, y: 200, w: 120, h: 80, color: '#ffbe0b', opacity: 0.8, rotation: -0.3, depth: 0.3, blendMode: 'source-over', strokeColor: null, strokeWidth: 0, animType: 'fadeIn', fill: true },
+        { type: 'line',     x: 100, y: 100, x2: 700, y2: 500, width: 3, color: '#ffffff', opacity: 0.5, depth: 0.2, blendMode: 'source-over', animType: 'fadeIn', cap: 'round' }
+      ], null, 2);
+      this._downloadText(template, 'shapes-template.json', 'application/json');
+    });
+
+    // Import JSON
+    this._on('btn-import-shapes-json', 'click', () => {
+      const name = document.getElementById('new-shapes-name')?.value.trim() || '';
+      this._pickFile('.json,text/plain', (text) => {
+        const n = this._storage.importUserShapesJSON(text, name);
+        if (n > 0) {
+          this._renderUserShapeList();
+          this._showToast(`Imported ${n} shape set${n > 1 ? 's' : ''}`);
+          const nameEl = document.getElementById('new-shapes-name');
+          if (nameEl) nameEl.value = '';
+        } else {
+          this._showToast('No valid shapes found in file');
+        }
+      });
+    });
+
+    // Export JSON
+    this._on('btn-export-shapes-json', 'click', () => {
+      const json = this._storage.exportUserShapesJSON();
+      this._downloadText(json, 'custom-shapes.json', 'application/json');
+      this._showToast('Shape sets exported');
+    });
+
+    this._renderUserShapeList();
+  }
+
+  _renderUserShapeList() {
+    const list = document.getElementById('user-shape-list');
+    if (!list) return;
+    list.innerHTML = '';
+
+    const sets = this._storage.getUserShapeSets();
+    for (const set of sets) {
+      const row = document.createElement('div');
+      row.className = 'user-item-row' + (set._active ? ' active' : '');
+      row.dataset.id = set.id;
+
+      const name = document.createElement('span');
+      name.className = 'user-item-name';
+      name.textContent = set.name;
+
+      const meta = document.createElement('span');
+      meta.className = 'user-item-meta';
+      meta.textContent = `${set.shapes.length} shape${set.shapes.length !== 1 ? 's' : ''}`;
+
+      const actions = document.createElement('div');
+      actions.className = 'user-item-actions';
+
+      // Toggle active
+      const toggleBtn = document.createElement('button');
+      toggleBtn.className = 'user-item-btn';
+      toggleBtn.textContent = set._active ? 'Active ✓' : 'Enable';
+      toggleBtn.setAttribute('aria-label', set._active ? `Disable ${set.name}` : `Enable ${set.name}`);
+      toggleBtn.setAttribute('aria-pressed', String(!!set._active));
+      toggleBtn.addEventListener('click', () => {
+        set._active = !set._active;
+        this._renderUserShapeList();
+        this._showToast(set._active ? `"${set.name}" enabled` : `"${set.name}" disabled`);
+      });
+
+      const renameBtn = document.createElement('button');
+      renameBtn.className = 'user-item-btn';
+      renameBtn.textContent = 'Rename';
+      renameBtn.addEventListener('click', () => {
+        const n = prompt('Rename shape set:', set.name);
+        if (n?.trim()) {
+          this._storage.renameUserShapeSet(set.id, n.trim());
+          this._renderUserShapeList();
+        }
+      });
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'user-item-btn danger';
+      delBtn.textContent = '✕';
+      delBtn.setAttribute('aria-label', `Delete ${set.name}`);
+      delBtn.addEventListener('click', () => {
+        if (confirm(`Delete shape set "${set.name}"?`)) {
+          this._storage.deleteUserShapeSet(set.id);
+          this._renderUserShapeList();
+        }
+      });
+
+      actions.append(toggleBtn, renameBtn, delBtn);
+      row.append(name, meta, actions);
+      list.appendChild(row);
+    }
+  }
+
+  // ─── Palette selector — also shows user palettes ──────────────────────────
+
+  _buildPaletteSelector() {
+    const container = document.getElementById('palette-list');
+    if (!container) return;
+    container.innerHTML = '';
+
+    // Random
+    const randBtn = this._makePaletteBtn('random', 'Random', ['#FF006E', '#FFBE0B', '#3A86FF', '#06FFB4', '#8338EC']);
+    randBtn.addEventListener('click', () => { this._palette.randomize(); this._updatePaletteUI(); });
+    container.appendChild(randBtn);
+
+    // Built-in palettes
+    for (const [key, def] of Object.entries(PALETTES)) {
+      const btn = this._makePaletteBtn(key, def.name, def.colors.slice(0, 5));
+      btn.addEventListener('click', () => { this._palette.setPalette(key); this._updatePaletteUI(); });
+      container.appendChild(btn);
+    }
+
+    // User palettes
+    const userPalettes = this._storage.getUserPalettes();
+    if (userPalettes.length > 0) {
+      const sep = document.createElement('div');
+      sep.style.cssText = 'font-size:10px;color:var(--ui-text-muted);text-transform:uppercase;letter-spacing:.08em;padding:6px 2px 2px;';
+      sep.textContent = 'Custom';
+      container.appendChild(sep);
+
+      for (const pal of userPalettes) {
+        const btn = this._makePaletteBtn('custom_' + pal.id, pal.name, pal.colors.slice(0, 5));
+        btn.addEventListener('click', () => {
+          this._palette.setCustomPalette(pal.colors, pal.backgrounds.length ? pal.backgrounds : ['#1a1a2e']);
+          this._updatePaletteUI();
+        });
+        container.appendChild(btn);
+      }
+    }
+
+    this._updatePaletteUI();
+  }
+
+  // ─── File picker helper ────────────────────────────────────────────────────
+
+  _pickFile(accept, onText) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = accept;
+    input.style.cssText = 'position:fixed;opacity:0;pointer-events:none;';
+    document.body.appendChild(input);
+    input.onchange = (e) => {
+      const file = e.target.files?.[0];
+      document.body.removeChild(input);
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => onText(ev.target.result);
+      reader.readAsText(file);
+    };
+    input.click();
+  }
+
+  // ─── Download text helper ──────────────────────────────────────────────────
+
+  _downloadText(text, filename, mime = 'text/plain') {
+    const blob = new Blob([text], { type: mime });
+    const url  = URL.createObjectURL(blob);
+    if (IS_IOS) {
+      window.open(url, '_blank');
+    } else {
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
   }
 
   // ─── Settings Persistence ──────────────────────────────────────────────────
