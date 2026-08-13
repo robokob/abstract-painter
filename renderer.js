@@ -14,6 +14,7 @@ import {
 } from './geometry.js';
 import { hexToRgba, shiftColor } from './palette.js';
 import { ShapeAnimator } from './animation.js';
+import { buildCanvasFilter, DEFAULT_EFFECTS } from './effects.mjs';
 
 // ─── Composition Parameters ───────────────────────────────────────────────────
 
@@ -392,6 +393,9 @@ class CanvasRenderer {
     this._logicalW = 0;
     this._logicalH = 0;
     this._background = '#1a1a2e';
+    this._backgroundImage = null;
+    this._backgroundImageObj = null;
+    this._effects = { ...DEFAULT_EFFECTS };
 
     // Transform state for pan/zoom
     this._panX = 0;
@@ -424,6 +428,23 @@ class CanvasRenderer {
     this._background = color;
   }
 
+  /** @param {string|null} dataUrl */
+  setBackgroundImage(dataUrl) {
+    this._backgroundImage = dataUrl || null;
+    this._backgroundImageObj = null;
+    if (this._backgroundImage) {
+      const img = new Image();
+      img.decoding = 'async';
+      img.src = this._backgroundImage;
+      this._backgroundImageObj = img;
+    }
+  }
+
+  /** @param {Record<string, number>} effects */
+  setEffects(effects) {
+    this._effects = { ...DEFAULT_EFFECTS, ...(effects || {}) };
+  }
+
   /** @param {number} x @param {number} y */
   setPan(x, y) {
     this._panX = x;
@@ -454,20 +475,28 @@ class CanvasRenderer {
     const h = this._logicalH;
 
     ctx.save();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    // Scale for DPR
-    ctx.scale(dpr, dpr);
+    const filter = buildCanvasFilter(this._effects);
+    ctx.filter = filter;
 
-    // Clear with background
-    ctx.fillStyle = this._background;
-    ctx.fillRect(0, 0, w, h);
+    if (this._backgroundImageObj && this._backgroundImageObj.complete) {
+      const img = this._backgroundImageObj;
+      const scale = Math.max(w / img.width, h / img.height);
+      const renderW = img.width * scale;
+      const renderH = img.height * scale;
+      const x = (w - renderW) / 2;
+      const y = (h - renderH) / 2;
+      ctx.drawImage(img, x, y, renderW, renderH);
+    } else {
+      ctx.fillStyle = this._background;
+      ctx.fillRect(0, 0, w, h);
+    }
 
-    // Apply pan/zoom transform
     ctx.translate(w / 2 + this._panX, h / 2 + this._panY);
     ctx.scale(this._zoom, this._zoom);
     ctx.translate(-w / 2, -h / 2);
 
-    // Draw all shapes
     for (const shape of shapes) {
       if (shape.animProgress <= 0 && shape.animDelay > 0) continue;
       shape.draw(ctx);
@@ -475,10 +504,39 @@ class CanvasRenderer {
 
     ctx.restore();
 
-    // Draw transition overlay
+    if (this._effects.vignette > 0) {
+      ctx.save();
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const vignette = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.2, w / 2, h / 2, Math.max(w, h) * 0.8);
+      vignette.addColorStop(0, `rgba(0, 0, 0, 0)`);
+      vignette.addColorStop(1, `rgba(25, 18, 40, ${this._effects.vignette})`);
+      ctx.fillStyle = vignette;
+      ctx.fillRect(0, 0, w, h);
+      ctx.restore();
+    }
+
+    if (this._effects.grain > 0) {
+      ctx.save();
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const grainCanvas = document.createElement('canvas');
+      grainCanvas.width = w;
+      grainCanvas.height = h;
+      const g = grainCanvas.getContext('2d');
+      const img = g.createImageData(w, h);
+      for (let i = 0; i < img.data.length; i += 4) {
+        const noise = (Math.random() - 0.5) * 255 * this._effects.grain;
+        img.data[i] = img.data[i + 1] = img.data[i + 2] = 255 + noise;
+        img.data[i + 3] = 30;
+      }
+      g.putImageData(img, 0, 0);
+      ctx.globalAlpha = 0.18;
+      ctx.drawImage(grainCanvas, 0, 0, w, h);
+      ctx.restore();
+    }
+
     if (overlayAlpha > 0) {
       ctx.save();
-      ctx.scale(dpr, dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.fillStyle = `rgba(0,0,0,${overlayAlpha.toFixed(3)})`;
       ctx.fillRect(0, 0, w, h);
       ctx.restore();
@@ -500,10 +558,22 @@ class CanvasRenderer {
 
     octx.save();
     octx.scale(scale, scale);
-    octx.fillStyle = background;
-    octx.fillRect(0, 0, this._logicalW, this._logicalH);
 
-    // Temporarily set animProgress to 1 for all shapes
+    if (this._backgroundImageObj && this._backgroundImageObj.complete) {
+      const img = this._backgroundImageObj;
+      const w = this._logicalW;
+      const h = this._logicalH;
+      const renderScale = Math.max(w / img.width, h / img.height);
+      const renderW = img.width * renderScale;
+      const renderH = img.height * renderScale;
+      const x = (w - renderW) / 2;
+      const y = (h - renderH) / 2;
+      octx.drawImage(img, x, y, renderW, renderH);
+    } else {
+      octx.fillStyle = background;
+      octx.fillRect(0, 0, this._logicalW, this._logicalH);
+    }
+
     const saved = shapes.map(s => s.animProgress);
     shapes.forEach(s => { s.animProgress = 1; });
 
@@ -511,7 +581,6 @@ class CanvasRenderer {
       shape.draw(octx);
     }
 
-    // Restore
     shapes.forEach((s, i) => { s.animProgress = saved[i]; });
 
     octx.restore();

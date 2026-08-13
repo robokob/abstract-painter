@@ -142,6 +142,44 @@
         <label for="bg-color-picker">Custom:</label>
         <input type="color" id="bg-color-picker" value="#1a1a2e" aria-label="Custom background color">
       </div>
+      <div class="bg-custom-row bg-upload-row">
+        <button id="btn-upload-background" class="import-action-btn secondary" type="button">Upload image</button>
+        <button id="btn-clear-background" class="import-action-btn secondary" type="button">Clear</button>
+      </div>
+    </section>
+
+    <section class="settings-section" aria-labelledby="section-effects-heading">
+      <h3 id="section-effects-heading">Dreamy Effects</h3>
+
+      <div class="slider-row">
+        <label class="slider-label" for="slider-glow">Glow</label>
+        <input type="range" id="slider-glow" min="0" max="1" step="0.01" value="0.25" aria-label="Glow effect">
+        <span class="slider-val" id="slider-glow-val">0.25</span>
+      </div>
+
+      <div class="slider-row">
+        <label class="slider-label" for="slider-blur">Blur</label>
+        <input type="range" id="slider-blur" min="0" max="1" step="0.01" value="0.20" aria-label="Blur effect">
+        <span class="slider-val" id="slider-blur-val">0.20</span>
+      </div>
+
+      <div class="slider-row">
+        <label class="slider-label" for="slider-grain">Grain</label>
+        <input type="range" id="slider-grain" min="0" max="1" step="0.01" value="0.12" aria-label="Grain effect">
+        <span class="slider-val" id="slider-grain-val">0.12</span>
+      </div>
+
+      <div class="slider-row">
+        <label class="slider-label" for="slider-vignette">Vignette</label>
+        <input type="range" id="slider-vignette" min="0" max="1" step="0.01" value="0.35" aria-label="Vignette effect">
+        <span class="slider-val" id="slider-vignette-val">0.35</span>
+      </div>
+
+      <div class="slider-row">
+        <label class="slider-label" for="slider-saturation">Saturation</label>
+        <input type="range" id="slider-saturation" min="0.4" max="2.2" step="0.01" value="1.15" aria-label="Saturation effect">
+        <span class="slider-val" id="slider-saturation-val">1.15</span>
+      </div>
     </section>
 
     <!-- Composition -->

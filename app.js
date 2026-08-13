@@ -13,6 +13,7 @@ import { CompositionGenerator, CanvasRenderer, DEFAULT_PARAMS } from './renderer
 import { AnimationController, ShapeAnimator, CanvasTransition } from './animation.js';
 import { ExportManager } from './export.js';
 import { StorageManager } from './storage.js';
+import { DEFAULT_EFFECTS, normalizeEffects } from './effects.mjs';
 
 // ─── iOS Detection ────────────────────────────────────────────────────────────
 
@@ -46,6 +47,8 @@ class AbstractPainterApp {
     // Composition state
     this._shapes = [];
     this._background = '#1a1a2e';
+    this._backgroundImage = null;
+    this._effects = { ...DEFAULT_EFFECTS };
     this._params = { ...DEFAULT_PARAMS };
 
     // Undo/redo history
@@ -132,8 +135,14 @@ class AbstractPainterApp {
       }
     }
 
-    this._background = this._palette.randomBackground();
-    this._renderer.setBackground(this._background);
+    if (!this._backgroundImage) {
+      this._background = this._palette.randomBackground();
+      this._renderer.setBackground(this._background);
+      this._renderer.setBackgroundImage(null);
+    } else {
+      this._renderer.setBackground(this._background);
+      this._renderer.setBackgroundImage(this._backgroundImage);
+    }
 
     const shapes = this._generator.generate(
       this._renderer.width,
@@ -214,6 +223,7 @@ class AbstractPainterApp {
     this._history.push({
       shapes: this._shapes.map(s => s.toJSON()),
       background: this._background,
+      backgroundImage: this._backgroundImage,
       palette: this._palette.serialize(),
       params: { ...this._params }
     });
@@ -241,8 +251,10 @@ class AbstractPainterApp {
     this._updatePaletteUI();
     this._params = { ...entry.params };
     this._syncSlidersToParams();
-    this._background = entry.background;
+    this._background = entry.background || '#1a1a2e';
+    this._backgroundImage = entry.backgroundImage || null;
     this._renderer.setBackground(this._background);
+    this._renderer.setBackgroundImage(this._backgroundImage);
     const shapes = entry.shapes.map(d => {
       const s = shapeFromJSON(d);
       s.animProgress = 1;
@@ -323,6 +335,7 @@ class AbstractPainterApp {
 
     this._setupSliders();
     this._setupBackgroundSelector();
+    this._setupDreamyEffects();
 
     // iOS Add to Home Screen banner close
     this._on('btn-ios-banner-close', 'click', () => {
@@ -348,6 +361,15 @@ class AbstractPainterApp {
       if (toolbar) toolbar.classList.toggle('hidden', !this._uiVisible);
       const btn = document.getElementById('btn-hide-ui');
       if (btn) btn.textContent = this._uiVisible ? '✕' : '☰';
+    });
+
+    this._on('btn-upload-background', 'click', () => this._pickBackgroundImage());
+    this._on('btn-clear-background', 'click', () => {
+      this._backgroundImage = null;
+      this._renderer.setBackgroundImage(null);
+      this._renderer.setBackground(this._background);
+      this._saveSettings();
+      this._showToast('Background cleared');
     });
 
     this._on('btn-import', 'click', () => {
@@ -536,9 +558,12 @@ class AbstractPainterApp {
       btn.style.background = col;
       btn.setAttribute('aria-label', `Background ${col}`);
       btn.addEventListener('click', () => {
+        this._backgroundImage = null;
         this._background = col;
+        this._renderer.setBackgroundImage(null);
         this._renderer.setBackground(col);
         this._params.background = col;
+        this._saveSettings();
         document.querySelectorAll('.bg-swatch').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
       });
@@ -550,10 +575,62 @@ class AbstractPainterApp {
     if (picker) {
       picker.value = this._background;
       picker.addEventListener('input', (e) => {
+        this._backgroundImage = null;
         this._background = e.target.value;
+        this._renderer.setBackgroundImage(null);
         this._renderer.setBackground(this._background);
         this._params.background = this._background;
+        this._saveSettings();
       });
+    }
+  }
+
+  _pickBackgroundImage() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.style.cssText = 'position:fixed;opacity:0;pointer-events:none;';
+    document.body.appendChild(input);
+    input.onchange = (e) => {
+      const file = e.target.files?.[0];
+      document.body.removeChild(input);
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        this._backgroundImage = String(reader.result);
+        this._renderer.setBackgroundImage(this._backgroundImage);
+        this._saveSettings();
+        this._showToast('Background image loaded');
+      };
+      reader.readAsDataURL(file);
+    };
+    input.click();
+  }
+
+  _setupDreamyEffects() {
+    const defs = [
+      { id: 'slider-glow', key: 'glow' },
+      { id: 'slider-blur', key: 'blur' },
+      { id: 'slider-grain', key: 'grain' },
+      { id: 'slider-vignette', key: 'vignette' },
+      { id: 'slider-saturation', key: 'saturation' }
+    ];
+
+    for (const def of defs) {
+      const el = document.getElementById(def.id);
+      if (!el) continue;
+      const valEl = document.getElementById(`${def.id}-val`);
+      el.value = this._effects[def.key];
+      const update = () => {
+        const value = Number(el.value);
+        const next = normalizeEffects({ ...this._effects, [def.key]: value });
+        this._effects = next;
+        this._renderer.setEffects(this._effects);
+        this._saveSettings();
+        if (valEl) valEl.textContent = value.toFixed(2);
+      };
+      el.addEventListener('input', update);
+      update();
     }
   }
 
@@ -921,8 +998,10 @@ class AbstractPainterApp {
     this._updatePaletteUI();
     this._params = { ...painting.params };
     this._syncSlidersToParams();
-    this._background = painting.background;
+    this._background = painting.background || '#1a1a2e';
+    this._backgroundImage = painting.backgroundImage || null;
     this._renderer.setBackground(this._background);
+    this._renderer.setBackgroundImage(this._backgroundImage);
     const shapes = painting.shapes.map(d => { const s = shapeFromJSON(d); s.animProgress = 1; return s; });
     this._transition.start(() => {
       this._shapes = shapes;
@@ -935,6 +1014,7 @@ class AbstractPainterApp {
     this._storage.savePainting({
       shapes: this._shapes,
       background: this._background,
+      backgroundImage: this._backgroundImage,
       palette: this._palette.serialize(),
       params: this._params,
       canvas: this._renderer.canvas
@@ -1416,7 +1496,10 @@ class AbstractPainterApp {
       params: this._params,
       paletteKey: this._palette.getCurrentKey(),
       animSpeed: this._animCtrl._speed,
-      continuousMotion: this._animCtrl.isContinuousMotion()
+      continuousMotion: this._animCtrl.isContinuousMotion(),
+      effects: this._effects,
+      backgroundImage: this._backgroundImage,
+      background: this._background
     });
   }
 
@@ -1430,6 +1513,9 @@ class AbstractPainterApp {
       this._animCtrl.setContinuousMotion(s.continuousMotion);
       this._animator.setContinuousMotion(s.continuousMotion);
     }
+    if (s.effects) this._effects = normalizeEffects(s.effects);
+    if (s.background) this._background = s.background;
+    if (s.backgroundImage) this._backgroundImage = s.backgroundImage;
   }
 
   // ─── Utility ───────────────────────────────────────────────────────────────
