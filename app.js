@@ -9,7 +9,7 @@
 
 import { PaletteManager, PALETTES } from './palette.js';
 import { shapeFromJSON } from './geometry.js';
-import { CompositionGenerator, CanvasRenderer, DEFAULT_PARAMS } from './renderer.js';
+import { CompositionGenerator, CanvasRenderer, DEFAULT_PARAMS } from './renderer.js?v=6';
 import { AnimationController, ShapeAnimator, CanvasTransition } from './animation.js';
 import { ExportManager } from './export.js';
 import { StorageManager } from './storage.js';
@@ -124,6 +124,10 @@ class AbstractPainterApp {
     this._renderer.render(this._shapes, this._transition.getOverlayAlpha());
   }
 
+  _setBackgroundImageOpacity() {
+    this._renderer.setBackgroundImageOpacity?.(this._backgroundImageOpacity);
+  }
+
   // ─── Painting Generation ──────────────────────────────────────────────────
 
   _generatePainting(opts = {}) {
@@ -145,7 +149,7 @@ class AbstractPainterApp {
       this._renderer.setBackground(this._background);
       this._renderer.setBackgroundImage(this._backgroundImage);
     }
-    this._renderer.setBackgroundImageOpacity(this._backgroundImageOpacity);
+    this._setBackgroundImageOpacity();
 
     const shapes = this._generator.generate(
       this._renderer.width,
@@ -260,7 +264,7 @@ class AbstractPainterApp {
     this._backgroundImageOpacity = entry.backgroundImageOpacity ?? 1;
     this._renderer.setBackground(this._background);
     this._renderer.setBackgroundImage(this._backgroundImage);
-    this._renderer.setBackgroundImageOpacity(this._backgroundImageOpacity);
+    this._setBackgroundImageOpacity();
     const shapes = entry.shapes.map(d => {
       const s = shapeFromJSON(d);
       s.animProgress = 1;
@@ -596,7 +600,7 @@ class AbstractPainterApp {
       imageMix.value = this._backgroundImageOpacity;
       const updateImageMix = () => {
         this._backgroundImageOpacity = Number(imageMix.value);
-        this._renderer.setBackgroundImageOpacity(this._backgroundImageOpacity);
+        this._setBackgroundImageOpacity();
         if (imageMixValue) imageMixValue.textContent = `${Math.round(this._backgroundImageOpacity * 100)}%`;
         this._saveSettings();
       };
@@ -631,7 +635,7 @@ class AbstractPainterApp {
     btn.addEventListener('click', () => {
       this._backgroundImage = this._lastBackgroundImage;
       this._renderer.setBackgroundImage(this._backgroundImage);
-      this._renderer.setBackgroundImageOpacity(this._backgroundImageOpacity);
+      this._setBackgroundImageOpacity();
       this._saveSettings();
       document.querySelectorAll('.bg-swatch').forEach(swatch => swatch.classList.remove('active'));
       btn.classList.add('active');
@@ -655,7 +659,7 @@ class AbstractPainterApp {
         this._backgroundImage = String(reader.result);
         this._lastBackgroundImage = this._backgroundImage;
         this._renderer.setBackgroundImage(this._backgroundImage);
-        this._renderer.setBackgroundImageOpacity(this._backgroundImageOpacity);
+        this._setBackgroundImageOpacity();
         this._saveSettings();
         this._renderImageBackgroundSwatch();
         this._showToast('Background image loaded');
