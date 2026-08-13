@@ -78,7 +78,6 @@ class AbstractPainterApp {
     this._deferredInstallPrompt = null;
     this._isFullscreen = false;
     this._compositionLocked = false;
-    this._liveRegenerateTimer = null;
   }
 
   // ─── Init ──────────────────────────────────────────────────────────────────
@@ -480,7 +479,7 @@ class AbstractPainterApp {
           this._animCtrl.setSpeed(v);
         } else {
           this._params[def.param] = v;
-          this._scheduleLiveRegenerate();
+          this._applySettingsToCurrentShapes();
         }
       };
       el.addEventListener('input', update);
@@ -488,12 +487,13 @@ class AbstractPainterApp {
     }
   }
 
-  _scheduleLiveRegenerate() {
-    if (this._compositionLocked) return;
-    clearTimeout(this._liveRegenerateTimer);
-    this._liveRegenerateTimer = setTimeout(() => {
-      this._generatePainting({ samePalette: true, pushHistory: false });
-    }, 100);
+  _applySettingsToCurrentShapes(recolor = false) {
+    const colors = recolor ? this._palette.getColors() : null;
+    this._shapes.forEach((shape, index) => {
+      shape.opacity = this._params.opacity;
+      shape.strokeWidth = this._params.strokeWidth;
+      if (colors?.length) shape.color = colors[index % colors.length];
+    });
   }
 
   _syncSlidersToParams() {
@@ -1466,7 +1466,7 @@ class AbstractPainterApp {
     randBtn.addEventListener('click', () => {
       this._palette.randomize();
       this._updatePaletteUI();
-      this._scheduleLiveRegenerate();
+      this._applySettingsToCurrentShapes(true);
     });
     container.appendChild(randBtn);
 
@@ -1476,7 +1476,7 @@ class AbstractPainterApp {
       btn.addEventListener('click', () => {
         this._palette.setPalette(key);
         this._updatePaletteUI();
-        this._scheduleLiveRegenerate();
+        this._applySettingsToCurrentShapes(true);
       });
       container.appendChild(btn);
     }
@@ -1494,7 +1494,7 @@ class AbstractPainterApp {
         btn.addEventListener('click', () => {
           this._palette.setCustomPalette(pal.colors, pal.backgrounds.length ? pal.backgrounds : ['#1a1a2e']);
           this._updatePaletteUI();
-          this._scheduleLiveRegenerate();
+          this._applySettingsToCurrentShapes(true);
         });
         container.appendChild(btn);
       }
