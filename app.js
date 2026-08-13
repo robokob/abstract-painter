@@ -77,6 +77,7 @@ class AbstractPainterApp {
     this._deferredInstallPrompt = null;
     this._isFullscreen = false;
     this._compositionLocked = false;
+    this._liveRegenerateTimer = null;
   }
 
   // ─── Init ──────────────────────────────────────────────────────────────────
@@ -476,11 +477,20 @@ class AbstractPainterApp {
           this._animCtrl.setSpeed(v);
         } else {
           this._params[def.param] = v;
+          this._scheduleLiveRegenerate();
         }
       };
       el.addEventListener('input', update);
       update();
     }
+  }
+
+  _scheduleLiveRegenerate() {
+    if (this._compositionLocked) return;
+    clearTimeout(this._liveRegenerateTimer);
+    this._liveRegenerateTimer = setTimeout(() => {
+      this._generatePainting({ samePalette: true, pushHistory: false });
+    }, 100);
   }
 
   _syncSlidersToParams() {
@@ -1423,13 +1433,21 @@ class AbstractPainterApp {
 
     // Random
     const randBtn = this._makePaletteBtn('random', 'Random', ['#FF006E', '#FFBE0B', '#3A86FF', '#06FFB4', '#8338EC']);
-    randBtn.addEventListener('click', () => { this._palette.randomize(); this._updatePaletteUI(); });
+    randBtn.addEventListener('click', () => {
+      this._palette.randomize();
+      this._updatePaletteUI();
+      this._scheduleLiveRegenerate();
+    });
     container.appendChild(randBtn);
 
     // Built-in palettes
     for (const [key, def] of Object.entries(PALETTES)) {
       const btn = this._makePaletteBtn(key, def.name, def.colors.slice(0, 5));
-      btn.addEventListener('click', () => { this._palette.setPalette(key); this._updatePaletteUI(); });
+      btn.addEventListener('click', () => {
+        this._palette.setPalette(key);
+        this._updatePaletteUI();
+        this._scheduleLiveRegenerate();
+      });
       container.appendChild(btn);
     }
 
@@ -1446,6 +1464,7 @@ class AbstractPainterApp {
         btn.addEventListener('click', () => {
           this._palette.setCustomPalette(pal.colors, pal.backgrounds.length ? pal.backgrounds : ['#1a1a2e']);
           this._updatePaletteUI();
+          this._scheduleLiveRegenerate();
         });
         container.appendChild(btn);
       }
