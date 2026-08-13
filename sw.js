@@ -23,6 +23,7 @@ const CACHE_ASSETS = [
   './animation.js',
   './export.js',
   './storage.js',
+  './effects.mjs',
   './manifest.json',
   './assets/icons/192.png',
   './assets/icons/512.png'
