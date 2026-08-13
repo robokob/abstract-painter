@@ -48,6 +48,7 @@ class AbstractPainterApp {
     this._shapes = [];
     this._background = '#1a1a2e';
     this._backgroundImage = null;
+    this._lastBackgroundImage = null;
     this._effects = { ...DEFAULT_EFFECTS };
     this._params = { ...DEFAULT_PARAMS };
 
@@ -367,9 +368,11 @@ class AbstractPainterApp {
     this._on('btn-upload-background', 'click', () => this._pickBackgroundImage());
     this._on('btn-clear-background', 'click', () => {
       this._backgroundImage = null;
+      this._lastBackgroundImage = null;
       this._renderer.setBackgroundImage(null);
       this._renderer.setBackground(this._background);
       this._saveSettings();
+      this._renderImageBackgroundSwatch();
       this._showToast('Background cleared');
     });
 
@@ -581,6 +584,8 @@ class AbstractPainterApp {
       container.appendChild(btn);
     }
 
+    this._renderImageBackgroundSwatch();
+
     const picker = document.getElementById('bg-color-picker');
     if (picker) {
       picker.value = this._background;
@@ -591,8 +596,31 @@ class AbstractPainterApp {
         this._renderer.setBackground(this._background);
         this._params.background = this._background;
         this._saveSettings();
+        document.querySelectorAll('.bg-swatch').forEach(swatch => swatch.classList.remove('active'));
       });
     }
+  }
+
+  _renderImageBackgroundSwatch() {
+    const container = document.getElementById('bg-colors');
+    if (!container) return;
+    container.querySelector('.bg-image-swatch')?.remove();
+    if (!this._lastBackgroundImage) return;
+
+    const btn = document.createElement('button');
+    btn.className = 'bg-swatch bg-image-swatch';
+    btn.style.backgroundImage = `url("${this._lastBackgroundImage}")`;
+    btn.setAttribute('aria-label', 'Use last uploaded background image');
+    btn.title = 'Use last uploaded image';
+    btn.addEventListener('click', () => {
+      this._backgroundImage = this._lastBackgroundImage;
+      this._renderer.setBackgroundImage(this._backgroundImage);
+      this._saveSettings();
+      document.querySelectorAll('.bg-swatch').forEach(swatch => swatch.classList.remove('active'));
+      btn.classList.add('active');
+    });
+    if (this._backgroundImage === this._lastBackgroundImage) btn.classList.add('active');
+    container.appendChild(btn);
   }
 
   _pickBackgroundImage() {
@@ -608,8 +636,10 @@ class AbstractPainterApp {
       const reader = new FileReader();
       reader.onload = () => {
         this._backgroundImage = String(reader.result);
+        this._lastBackgroundImage = this._backgroundImage;
         this._renderer.setBackgroundImage(this._backgroundImage);
         this._saveSettings();
+        this._renderImageBackgroundSwatch();
         this._showToast('Background image loaded');
       };
       reader.readAsDataURL(file);
@@ -1518,6 +1548,7 @@ class AbstractPainterApp {
       continuousMotion: this._animCtrl.isContinuousMotion(),
       effects: this._effects,
       backgroundImage: this._backgroundImage,
+      lastBackgroundImage: this._lastBackgroundImage,
       background: this._background
     });
   }
@@ -1535,6 +1566,8 @@ class AbstractPainterApp {
     if (s.effects) this._effects = normalizeEffects(s.effects);
     if (s.background) this._background = s.background;
     if (s.backgroundImage) this._backgroundImage = s.backgroundImage;
+    if (s.lastBackgroundImage) this._lastBackgroundImage = s.lastBackgroundImage;
+    else if (s.backgroundImage) this._lastBackgroundImage = s.backgroundImage;
   }
 
   // ─── Utility ───────────────────────────────────────────────────────────────

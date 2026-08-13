@@ -448,6 +448,11 @@ body {
 .bg-swatch:hover,
 .bg-swatch:active { transform: scale(1.15); border-color: var(--ui-text); }
 .bg-swatch.active { border-color: var(--ui-accent); box-shadow: 0 0 0 2px var(--ui-accent); }
+.bg-image-swatch {
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
 
 .bg-custom-row { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
 .bg-custom-row label { font-size: 12px; color: var(--ui-text-muted); }
