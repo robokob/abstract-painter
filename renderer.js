@@ -395,6 +395,7 @@ class CanvasRenderer {
     this._background = '#1a1a2e';
     this._backgroundImage = null;
     this._backgroundImageObj = null;
+    this._backgroundImageOpacity = 1;
     this._effects = { ...DEFAULT_EFFECTS };
 
     // Transform state for pan/zoom
@@ -440,6 +441,11 @@ class CanvasRenderer {
     }
   }
 
+  /** @param {number} opacity */
+  setBackgroundImageOpacity(opacity) {
+    this._backgroundImageOpacity = clamp(Number(opacity) || 0, 0, 1);
+  }
+
   /** @param {Record<string, number>} effects */
   setEffects(effects) {
     this._effects = { ...DEFAULT_EFFECTS, ...(effects || {}) };
@@ -480,17 +486,19 @@ class CanvasRenderer {
     const filter = buildCanvasFilter(this._effects);
     ctx.filter = filter;
 
-    if (this._backgroundImageObj && this._backgroundImageObj.complete) {
+    ctx.fillStyle = this._background;
+    ctx.fillRect(0, 0, w, h);
+
+    if (this._backgroundImageObj && this._backgroundImageObj.complete && this._backgroundImageOpacity > 0) {
       const img = this._backgroundImageObj;
       const scale = Math.max(w / img.width, h / img.height);
       const renderW = img.width * scale;
       const renderH = img.height * scale;
       const x = (w - renderW) / 2;
       const y = (h - renderH) / 2;
+      ctx.globalAlpha = this._backgroundImageOpacity;
       ctx.drawImage(img, x, y, renderW, renderH);
-    } else {
-      ctx.fillStyle = this._background;
-      ctx.fillRect(0, 0, w, h);
+      ctx.globalAlpha = 1;
     }
 
     ctx.translate(w / 2 + this._panX, h / 2 + this._panY);
@@ -559,7 +567,10 @@ class CanvasRenderer {
     octx.save();
     octx.scale(scale, scale);
 
-    if (this._backgroundImageObj && this._backgroundImageObj.complete) {
+    octx.fillStyle = background;
+    octx.fillRect(0, 0, this._logicalW, this._logicalH);
+
+    if (this._backgroundImageObj && this._backgroundImageObj.complete && this._backgroundImageOpacity > 0) {
       const img = this._backgroundImageObj;
       const w = this._logicalW;
       const h = this._logicalH;
@@ -568,10 +579,9 @@ class CanvasRenderer {
       const renderH = img.height * renderScale;
       const x = (w - renderW) / 2;
       const y = (h - renderH) / 2;
+      octx.globalAlpha = this._backgroundImageOpacity;
       octx.drawImage(img, x, y, renderW, renderH);
-    } else {
-      octx.fillStyle = background;
-      octx.fillRect(0, 0, this._logicalW, this._logicalH);
+      octx.globalAlpha = 1;
     }
 
     const saved = shapes.map(s => s.animProgress);

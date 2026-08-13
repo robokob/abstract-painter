@@ -49,6 +49,7 @@ class AbstractPainterApp {
     this._background = '#1a1a2e';
     this._backgroundImage = null;
     this._lastBackgroundImage = null;
+    this._backgroundImageOpacity = 1;
     this._effects = { ...DEFAULT_EFFECTS };
     this._params = { ...DEFAULT_PARAMS };
 
@@ -144,6 +145,7 @@ class AbstractPainterApp {
       this._renderer.setBackground(this._background);
       this._renderer.setBackgroundImage(this._backgroundImage);
     }
+    this._renderer.setBackgroundImageOpacity(this._backgroundImageOpacity);
 
     const shapes = this._generator.generate(
       this._renderer.width,
@@ -225,6 +227,7 @@ class AbstractPainterApp {
       shapes: this._shapes.map(s => s.toJSON()),
       background: this._background,
       backgroundImage: this._backgroundImage,
+      backgroundImageOpacity: this._backgroundImageOpacity,
       palette: this._palette.serialize(),
       params: { ...this._params }
     });
@@ -254,8 +257,10 @@ class AbstractPainterApp {
     this._syncSlidersToParams();
     this._background = entry.background || '#1a1a2e';
     this._backgroundImage = entry.backgroundImage || null;
+    this._backgroundImageOpacity = entry.backgroundImageOpacity ?? 1;
     this._renderer.setBackground(this._background);
     this._renderer.setBackgroundImage(this._backgroundImage);
+    this._renderer.setBackgroundImageOpacity(this._backgroundImageOpacity);
     const shapes = entry.shapes.map(d => {
       const s = shapeFromJSON(d);
       s.animProgress = 1;
@@ -368,6 +373,7 @@ class AbstractPainterApp {
     this._on('btn-clear-background', 'click', () => {
       this._backgroundImage = null;
       this._lastBackgroundImage = null;
+      this._backgroundImageOpacity = 1;
       this._renderer.setBackgroundImage(null);
       this._renderer.setBackground(this._background);
       this._saveSettings();
@@ -571,9 +577,7 @@ class AbstractPainterApp {
       btn.style.background = col;
       btn.setAttribute('aria-label', `Background ${col}`);
       btn.addEventListener('click', () => {
-        this._backgroundImage = null;
         this._background = col;
-        this._renderer.setBackgroundImage(null);
         this._renderer.setBackground(col);
         this._params.background = col;
         this._saveSettings();
@@ -586,13 +590,25 @@ class AbstractPainterApp {
 
     this._renderImageBackgroundSwatch();
 
+    const imageMix = document.getElementById('slider-image-mix');
+    const imageMixValue = document.getElementById('slider-image-mix-val');
+    if (imageMix) {
+      imageMix.value = this._backgroundImageOpacity;
+      const updateImageMix = () => {
+        this._backgroundImageOpacity = Number(imageMix.value);
+        this._renderer.setBackgroundImageOpacity(this._backgroundImageOpacity);
+        if (imageMixValue) imageMixValue.textContent = `${Math.round(this._backgroundImageOpacity * 100)}%`;
+        this._saveSettings();
+      };
+      imageMix.addEventListener('input', updateImageMix);
+      updateImageMix();
+    }
+
     const picker = document.getElementById('bg-color-picker');
     if (picker) {
       picker.value = this._background;
       picker.addEventListener('input', (e) => {
-        this._backgroundImage = null;
         this._background = e.target.value;
-        this._renderer.setBackgroundImage(null);
         this._renderer.setBackground(this._background);
         this._params.background = this._background;
         this._saveSettings();
@@ -615,6 +631,7 @@ class AbstractPainterApp {
     btn.addEventListener('click', () => {
       this._backgroundImage = this._lastBackgroundImage;
       this._renderer.setBackgroundImage(this._backgroundImage);
+      this._renderer.setBackgroundImageOpacity(this._backgroundImageOpacity);
       this._saveSettings();
       document.querySelectorAll('.bg-swatch').forEach(swatch => swatch.classList.remove('active'));
       btn.classList.add('active');
@@ -638,6 +655,7 @@ class AbstractPainterApp {
         this._backgroundImage = String(reader.result);
         this._lastBackgroundImage = this._backgroundImage;
         this._renderer.setBackgroundImage(this._backgroundImage);
+        this._renderer.setBackgroundImageOpacity(this._backgroundImageOpacity);
         this._saveSettings();
         this._renderImageBackgroundSwatch();
         this._showToast('Background image loaded');
@@ -1548,6 +1566,7 @@ class AbstractPainterApp {
       continuousMotion: this._animCtrl.isContinuousMotion(),
       effects: this._effects,
       backgroundImage: this._backgroundImage,
+      backgroundImageOpacity: this._backgroundImageOpacity,
       lastBackgroundImage: this._lastBackgroundImage,
       background: this._background
     });
@@ -1566,6 +1585,7 @@ class AbstractPainterApp {
     if (s.effects) this._effects = normalizeEffects(s.effects);
     if (s.background) this._background = s.background;
     if (s.backgroundImage) this._backgroundImage = s.backgroundImage;
+    if (s.backgroundImageOpacity !== undefined) this._backgroundImageOpacity = Number(s.backgroundImageOpacity);
     if (s.lastBackgroundImage) this._lastBackgroundImage = s.lastBackgroundImage;
     else if (s.backgroundImage) this._lastBackgroundImage = s.backgroundImage;
   }
