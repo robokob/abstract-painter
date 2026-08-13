@@ -1,6 +1,6 @@
 /**
  * Service Worker for Abstract Painter PWA.
- * Cache-first strategy for all app assets.
+ * Network-first strategy with an offline cache fallback.
  * Works on iOS Safari (14+), Android Chrome, Desktop Chrome.
  *
  * iOS notes:
@@ -9,7 +9,7 @@
  *  - Use relative URLs (no leading slash) so the scope is correct on sub-path deployments.
  */
 
-const CACHE_NAME = 'abstract-painter-v2';
+const CACHE_NAME = 'abstract-painter-v4';
 
 // Relative URLs — work regardless of deployment path
 const CACHE_ASSETS = [
@@ -62,27 +62,20 @@ self.addEventListener('fetch', (event) => {
   if (event.request.url.includes('chrome-extension')) return;
 
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-
-      return fetch(event.request)
-        .then((response) => {
-          // Don't cache bad responses or opaque (cross-origin) responses
-          if (!response || response.status !== 200 || response.type !== 'basic') {
-            return response;
-          }
-          // Cache a clone so we can still return the original
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+    fetch(event.request)
+      .then((response) => {
+        if (!response || response.status !== 200 || response.type !== 'basic') {
           return response;
-        })
-        .catch(() => {
-          // Offline fallback: return the cached index for navigation requests
-          if (event.request.mode === 'navigate') {
-            return caches.match('./index.html');
-          }
-          // For other assets, just fail silently
-        });
-    })
+        }
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        return response;
+      })
+      .catch(async () => {
+        const cached = await caches.match(event.request);
+        if (cached) return cached;
+        if (event.request.mode === 'navigate') return caches.match('./index.html');
+        return Response.error();
+      })
   );
 });
