@@ -631,7 +631,7 @@ body {
   position: fixed;
   inset: 0;
   z-index: 150;
-  background: rgba(0, 0, 0, 0.4);
+  background: transparent;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.3s;
